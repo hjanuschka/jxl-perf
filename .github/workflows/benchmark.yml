@@ -1,0 +1,104 @@
+name: Performance Benchmarks
+
+on:
+  schedule:
+    - cron: '0 */2 * * *'  # Every 2 hours
+  workflow_dispatch:  # Allow manual trigger
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout jxl-rs
+        uses: actions/checkout@v4
+        with:
+          repository: libjxl/jxl-rs
+          path: jxl-rs
+          fetch-depth: 1
+
+      - name: Checkout benchmark scripts
+        uses: actions/checkout@v4
+        with:
+          path: jxl-perf
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libjxl-dev cmake build-essential pkg-config
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Copy Rust benchmark to jxl-rs
+        run: |
+          mkdir -p jxl-rs/jxl/examples
+          cp jxl-perf/test_decode_rs.rs jxl-rs/jxl/examples/
+
+      - name: Build Rust benchmark
+        working-directory: jxl-rs
+        run: cargo build --example test_decode_rs --release
+
+      - name: Build C++ benchmark
+        working-directory: jxl-perf
+        run: |
+          mkdir -p build
+          cd build
+          cmake ..
+          cmake --build .
+
+      - name: Setup testbed
+        working-directory: jxl-perf
+        run: |
+          mkdir -p /tmp/jxl-perf
+          git clone --depth 1 https://github.com/libjxl/conformance.git /tmp/jxl-perf/conformance
+          echo "/tmp/jxl-perf" > .testbed_path
+
+      - name: Run benchmarks
+        working-directory: jxl-perf
+        run: |
+          # Update paths in run script
+          sed -i 's|^\(RUST_BINARY=\).*|\1"$GITHUB_WORKSPACE/jxl-rs/target/release/examples/test_decode_rs"|' run_benchmarks.sh
+          sed -i 's|^\(CXX_BINARY=\).*|\1"./build/test_decode_cxx"|' run_benchmarks.sh
+          ./run_benchmarks.sh
+
+      - name: Generate HTML report
+        working-directory: jxl-perf
+        run: python3 generate_html.py benchmark_results.csv benchmark_failures.txt index.html
+
+      - name: Archive benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ github.run_number }}
+          path: |
+            jxl-perf/benchmark_results.csv
+            jxl-perf/benchmark_failures.txt
+            jxl-perf/index.html
+
+      - name: Prepare GitHub Pages content
+        run: |
+          mkdir -p gh-pages
+          cp jxl-perf/index.html gh-pages/
+          cp jxl-perf/benchmark_results.csv gh-pages/
+          cp jxl-perf/benchmark_failures.txt gh-pages/ || true
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./gh-pages
+          publish_branch: gh-pages
+          keep_files: false
+          enable_jekyll: false
+          force_orphan: true
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'Update benchmarks (run #${{ github.run_number }})'
