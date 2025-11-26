@@ -5,3 +5,4 @@ index.html
 build/
 test_decode_rs
 benchmark_run.log
+.jxl_rs_path

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Read testbed path from setup.sh
+# Read paths from setup.sh
 if [ -f .testbed_path ]; then
     TESTBED_DIR=$(cat .testbed_path)
 else
@@ -9,12 +9,20 @@ else
     echo "Warning: .testbed_path not found, using default: $TESTBED_DIR"
 fi
 
+if [ -f .jxl_rs_path ]; then
+    JXL_RS_DIR=$(cat .jxl_rs_path)
+else
+    JXL_RS_DIR="${JXL_RS_DIR:-../jxl-rs}"
+    echo "Warning: .jxl_rs_path not found, using default: $JXL_RS_DIR"
+fi
+
 CONFORMANCE_DIR="$TESTBED_DIR/conformance"
 OUTPUT_FILE="benchmark_results.csv"
 FAILED_FILE="benchmark_failures.txt"
 WARMUP_RUNS=2
 BENCHMARK_RUNS=3
-RUST_BINARY="./target/release/examples/test_decode_rs"
+RUST_BINARY="$JXL_RS_DIR/target/release/examples/test_decode_rs"
+CXX_BINARY="./build/test_decode_cxx"
 
 echo "=== Running Benchmark Suite ==="
 echo "Testbed directory: $TESTBED_DIR"
@@ -49,7 +57,6 @@ echo "testcase,decoder,width,height,channels,parse_ms,decode_ms,total_ms,through
 > "$FAILED_FILE"
 
 # Check if C++ binary exists
-CXX_BINARY="./tools/build/test_decode_cxx"
 if [ -f "$CXX_BINARY" ]; then
     HAS_CXX=1
     echo "Both Rust and C++ benchmarks will be run"
