@@ -34,8 +34,21 @@ fn main() -> Result<(), Error> {
     let (width, height) = basic_info.size;
     let num_extra_channels = basic_info.extra_channels.len();
 
-    // For benchmark simplicity, always decode to RGBA if there are extra channels
-    // Use None for extra channels to blend them into the main RGBA buffer
+    // Skip images with non-alpha extra channels for benchmark simplicity
+    // These include CMYK, spot colors, etc. that need complex handling
+    let has_non_alpha_channels = basic_info
+        .extra_channels
+        .iter()
+        .any(|ec| !matches!(ec.ec_type, jxl::headers::extra_channels::ExtraChannel::Alpha));
+
+    if has_non_alpha_channels {
+        eprintln!("Skipping image with non-alpha extra channels (CMYK, spot colors, etc.)");
+        std::process::exit(1);
+    }
+
+    // For alpha channels, use None to blend into RGBA
+    let extra_channel_format = vec![None; num_extra_channels];
+
     let pixel_format = JxlPixelFormat {
         color_type: if num_extra_channels > 0 {
             JxlColorType::Rgba
@@ -43,7 +56,7 @@ fn main() -> Result<(), Error> {
             JxlColorType::Rgb
         },
         color_data_format: Some(JxlDataFormat::U8 { bit_depth: 8 }),
-        extra_channel_format: vec![None; num_extra_channels],  // Use None to blend into RGBA
+        extra_channel_format,
     };
 
     decoder.set_pixel_format(pixel_format);
