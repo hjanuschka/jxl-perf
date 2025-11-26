@@ -32,16 +32,18 @@ fn main() -> Result<(), Error> {
     let parse_time = start_parse.elapsed();
 
     let (width, height) = basic_info.size;
-    let has_alpha = !basic_info.extra_channels.is_empty();
+    let num_extra_channels = basic_info.extra_channels.len();
 
+    // For benchmark simplicity, always decode to RGBA if there are extra channels
+    // Use None for extra channels to blend them into the main RGBA buffer
     let pixel_format = JxlPixelFormat {
-        color_type: if has_alpha {
+        color_type: if num_extra_channels > 0 {
             JxlColorType::Rgba
         } else {
             JxlColorType::Rgb
         },
         color_data_format: Some(JxlDataFormat::U8 { bit_depth: 8 }),
-        extra_channel_format: vec![],
+        extra_channel_format: vec![None; num_extra_channels],  // Use None to blend into RGBA
     };
 
     decoder.set_pixel_format(pixel_format);
@@ -54,11 +56,11 @@ fn main() -> Result<(), Error> {
         }
     };
 
-    let num_channels = if has_alpha { 4 } else { 3 };
+    let num_channels = if num_extra_channels > 0 { 4 } else { 3 };
     let bytes_per_row = width * num_channels;
     let mut buffer = vec![0u8; width * height * num_channels];
 
-    let output_buffer = JxlOutputBuffer::new(&mut buffer, height, bytes_per_row);
+    let mut output_buffer = JxlOutputBuffer::new(&mut buffer, height, bytes_per_row);
 
     let start_decode = Instant::now();
     let _decoder = loop {
