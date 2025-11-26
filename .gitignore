@@ -2,3 +2,6 @@
 *.swp
 perf.data
 perf.data.old
+.testbed_path
+benchmark_results.csv
+tools/build/
