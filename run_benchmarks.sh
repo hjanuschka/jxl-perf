@@ -19,9 +19,9 @@ fi
 CONFORMANCE_DIR="$TESTBED_DIR/conformance"
 OUTPUT_FILE="benchmark_results.csv"
 FAILED_FILE="benchmark_failures.txt"
-WARMUP_RUNS=2
-BENCHMARK_RUNS=3
-RUST_BINARY="$JXL_RS_DIR/target/release/examples/test_decode_rs"
+WARMUP_RUNS=3
+BENCHMARK_RUNS=10
+RUST_BINARY="./target/release/test_decode_rs"
 CXX_BINARY="./build/test_decode_cxx"
 
 echo "=== Running Benchmark Suite ==="

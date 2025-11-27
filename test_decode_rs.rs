@@ -32,25 +32,27 @@ fn main() -> Result<(), Error> {
     let parse_time = start_parse.elapsed();
 
     let (width, height) = basic_info.size;
-    let num_extra_channels = basic_info.extra_channels.len();
 
-    // Skip images with non-alpha extra channels for benchmark simplicity
-    // These include CMYK, spot colors, etc. that need complex handling
-    let has_non_alpha_channels = basic_info
+    // Determine how to handle extra channels
+    // - Alpha channels: blend into RGBA (use None)
+    // - Non-alpha channels: need separate F32 buffers (use Some(F32))
+    let extra_channel_format: Vec<_> = basic_info
         .extra_channels
         .iter()
-        .any(|ec| !matches!(ec.ec_type, jxl::headers::extra_channels::ExtraChannel::Alpha));
+        .map(|ec| {
+            match ec.ec_type {
+                jxl::headers::extra_channels::ExtraChannel::Alpha => None, // Blend into RGBA
+                _ => Some(JxlDataFormat::f32()), // Separate F32 buffer for spot colors, CMYK, etc.
+            }
+        })
+        .collect();
 
-    if has_non_alpha_channels {
-        eprintln!("Skipping image with non-alpha extra channels (CMYK, spot colors, etc.)");
-        std::process::exit(1);
-    }
-
-    // For alpha channels, use None to blend into RGBA
-    let extra_channel_format = vec![None; num_extra_channels];
+    // Count how many separate buffers we need
+    let num_separate_channels = extra_channel_format.iter().filter(|ec| ec.is_some()).count();
+    let has_alpha = extra_channel_format.iter().any(|ec| ec.is_none());
 
     let pixel_format = JxlPixelFormat {
-        color_type: if num_extra_channels > 0 {
+        color_type: if has_alpha {
             JxlColorType::Rgba
         } else {
             JxlColorType::Rgb
@@ -60,24 +62,54 @@ fn main() -> Result<(), Error> {
     };
 
     decoder.set_pixel_format(pixel_format);
+
+    // Advance to frame info state
     let decoder = loop {
-        match decoder.process(&mut input)? {
-            ProcessingResult::Complete { result } => break result,
-            ProcessingResult::NeedsMoreInput { .. } => {
+        match decoder.process(&mut input) {
+            Ok(ProcessingResult::Complete { result }) => break result,
+            Ok(ProcessingResult::NeedsMoreInput { .. }) => {
                 return Err(Error::OutOfBounds(0));
+            }
+            Err(e) => {
+                // Some images trigger pipeline setup issues with extra channels
+                // Skip them for now (known limitation)
+                eprintln!("Error during frame info setup: {:?}", e);
+                eprintln!("Skipping image (pipeline setup issue with extra channels)");
+                std::process::exit(1);
             }
         }
     };
 
-    let num_channels = if num_extra_channels > 0 { 4 } else { 3 };
+    // Allocate main color buffer (RGB or RGBA)
+    let num_channels = if has_alpha { 4 } else { 3 };
     let bytes_per_row = width * num_channels;
     let mut buffer = vec![0u8; width * height * num_channels];
 
-    let mut output_buffer = JxlOutputBuffer::new(&mut buffer, height, bytes_per_row);
+    // Allocate separate F32 buffers for non-alpha extra channels
+    let mut extra_buffers: Vec<Vec<f32>> = (0..num_separate_channels)
+        .map(|_| vec![0.0f32; width * height])
+        .collect();
+
+    // Create output buffers array
+    let mut output_buffers = vec![JxlOutputBuffer::new(&mut buffer, height, bytes_per_row)];
+
+    for extra_buf in &mut extra_buffers {
+        let extra_bytes = unsafe {
+            std::slice::from_raw_parts_mut(
+                extra_buf.as_mut_ptr() as *mut u8,
+                extra_buf.len() * std::mem::size_of::<f32>(),
+            )
+        };
+        output_buffers.push(JxlOutputBuffer::new(
+            extra_bytes,
+            height,
+            width * std::mem::size_of::<f32>(),
+        ));
+    }
 
     let start_decode = Instant::now();
     let _decoder = loop {
-        match decoder.process(&mut input, &mut [output_buffer])? {
+        match decoder.process(&mut input, &mut output_buffers)? {
             ProcessingResult::Complete { result } => break result,
             ProcessingResult::NeedsMoreInput { .. } => {
                 return Err(Error::OutOfBounds(0));

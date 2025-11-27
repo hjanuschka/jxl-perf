@@ -1,0 +1,20 @@
+[package]
+name = "jxl-perf"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+jxl = { path = "jxl-rs/jxl", features = ["avx"] }
+
+[[bin]]
+name = "test_decode_rs"
+path = "test_decode_rs.rs"
+
+[profile.release]
+lto = "fat"              # Full Link-Time Optimization
+codegen-units = 1        # Better optimization (slower compile, faster runtime)
+opt-level = 3            # Maximum optimization
+debug = true             # Enable debug symbols for profiling
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "target-cpu=native"]
