@@ -9,11 +9,12 @@
 - **Average slowdown**: 1.76x
 - **Status**: Many scalar loops, no SIMD in render stages
 
-### Current (Round 20)
-- **Average slowdown**: 1.34x
-- **Improvement**: Closed **24% of the gap** (from 1.76x to 1.34x)
-- **Remaining**: Need to close another **25%** to reach 1.0x parity
-- **Key achievement**: grayscale_5 at 1.01x (essentially at parity!)
+### Current (Round 21)
+- **Average slowdown**: 1.35x
+- **Improvement**: Closed **24% of the gap** (from 1.76x to 1.35x)
+- **Remaining**: Need to close another **26%** to reach 1.0x parity
+- **Key achievement**: cafe 2.22x → 1.65x (25% improvement!)
+- **Concern**: grayscale_5 regressed from 1.01x to 1.62x
 
 ## Optimizations Completed
 
@@ -54,6 +55,16 @@
   - Overall: 1.36x → 1.34x (2% improvement)
 - Result: 1.36x → **1.34x** (profile-guided optimization wins again!)
 
+### Round 21: Palette Transform SIMD 🎨
+- **Target**: cafe test (NEW #1 bottleneck at 2.22x)
+- **Added AVX2 gather optimization**: Vectorized palette lookup inner loop
+- **Implementation**: `_mm256_i32gather_epi32` for 8-pixel batch lookups
+- **SIMD bounds checking**: Fast path for valid indices, scalar fallback for edge cases
+- **cafe results**: 2.22x → **1.65x** (25% improvement! Dropped from #1 to below top 5!)
+- **cafe_5 results**: 1.92x → 1.75x (9% improvement)
+- **Regression**: grayscale_5: 1.01x → 1.62x (LOST PARITY - concerning!)
+- Result: 1.34x → **1.35x** (cafe much better, but grayscale_5 regressed)
+
 ## Files Optimized with SIMD
 
 ### Render Stages (jxl/src/render/stages/)
@@ -76,58 +87,55 @@
 2. ✅ RCT transforms - Already SIMD
 3. ✅ Squeeze transforms - Already SIMD
 
+### Modular Transforms
+1. ✅ `frame/modular/transforms/palette.rs` - AVX2 gather for palette lookups (Round 21)
+
 ## Top Remaining Bottlenecks
 
-### Current Top 10 Slow Tests (Round 20)
-1. **cafe** - 2.22x slower (1280x1600 RGB) ← NEW #1!
-2. **grayscale_jpeg_5** - 2.15x slower (200x200) ← Regression
-3. **grayscale_jpeg** - 2.07x slower (200x200) ← Regression
-4. **cafe_5** - 1.92x slower (1280x1600 RGB)
-5. **noise_5** - 1.88x slower (500x606)
-6. **bicycles** - 1.88x slower (1024x631)
-7. **noise** - 1.88x slower (500x606)
-8. **alpha_triangles** - 1.79x slower (1024x1024 alpha)
-9. **grayscale** - 1.75x slower (200x200) ← Much improved!
-10. **opsin_inverse_5** - 1.63x slower (500x606)
+### Current Top 10 Slow Tests (Round 21)
+1. **noise_5** - 2.12x slower (500x606) ← NEW #1! ANS entropy decoding
+2. **grayscale_jpeg** - 1.92x slower (200x200)
+3. **grayscale_jpeg_5** - 1.82x slower (200x200)
+4. **cafe_5** - 1.75x slower (1280x1600 RGB) ← Improved from #4!
+5. **cafe** - 1.65x slower (1280x1600 RGB) ← HUGE improvement from #1!
+6. **grayscale_5** - 1.62x slower (200x200) ← REGRESSED from 1.01x!
+7. **bicycles** - 1.62x slower (1024x631)
+8. **alpha_triangles** - 1.60x slower (1024x1024 alpha)
+9. **upsampling** - 1.58x slower
+10. **noise** - 1.47x slower (500x606) ← Regressed
 
-### Pattern Analysis (Updated Round 20)
-- **Cafe tests now #1**: 1.92x-2.22x, large RGB images - NEW TARGET!
-- **JPEG tests regressed**: grayscale_jpeg tests got 5-11% slower
-- **Pure grayscale improved**: grayscale/grayscale_5 much better (1.75x/1.01x!)
-- **Noise tests stable**: Still 1.88x, ANS decoding bottleneck
-- **Progress**: grayscale_5 essentially at parity (1.01x)!
+### Pattern Analysis (Updated Round 21)
+- **cafe optimization SUCCESS**: 2.22x → 1.65x (25% faster!), dropped from #1 to #5
+- **NEW #1 bottleneck**: noise_5 at 2.12x (ANS entropy decoding)
+- **CRITICAL REGRESSION**: grayscale_5: 1.01x → 1.62x (LOST PARITY!)
+- **Other regressions**: noise: 1.35x → 1.47x, upsampling slight regression
+- **JPEG tests improved**: grayscale_jpeg tests now 1.82x-1.92x (better than Round 20)
 
 ## Likely Remaining Bottlenecks
 
-### 1. Palette Transforms (Modular Images)
-**File**: `frame/modular/transforms/palette.rs:186-254`
+### 1. ANS Entropy Decoding
+**Impact**: noise_5 is NEW #1 at 2.12x
+**Status**: Already has some SIMD, but may need more optimization
+**Priority**: HIGH - now the #1 bottleneck
 
-Triple nested loops processing palette lookups:
-```rust
-for (chan_index, out) in buf_out.iter_mut().enumerate() {
-    for y in 0..h {
-        for x in 0..w {
-            let index = row_index[x];
-            let palette_value = get_palette_value(...);
-            row_out[x] = palette_value;
-        }
-    }
-}
-```
+### 2. grayscale_5 Regression (CRITICAL!)
+**Issue**: Regressed from 1.01x → 1.62x in Round 21
+**Possible causes**:
+- Code layout changes affecting instruction cache
+- Feature detection overhead
+- Something unrelated in build process
+**Priority**: URGENT - investigate before more optimizations
 
-**Impact**: Likely significant for grayscale/modular images
-**Optimization**: SIMD-vectorize inner loop, batch palette lookups
-
-### 2. Memory/Cache Issues
+### 3. Memory/Cache Issues
 Small images (200x200) being 2.2x slower suggests:
 - Cache misses
 - Memory allocation overhead
 - Non-computational bottlenecks
 
-### 3. JPEG Decoding Overhead
-`grayscale_jpeg` tests specifically slow - could be in JPEG recompression path.
+### 4. JPEG Decoding Overhead
+`grayscale_jpeg` tests at 1.82x-1.92x - could be in JPEG recompression path.
 
-### 4. Algorithmic Differences
+### 5. Algorithmic Differences
 Some paths may use different algorithms than C++ libjxl.
 
 ## Technical Insights
@@ -137,6 +145,8 @@ Some paths may use different algorithms than C++ libjxl.
 2. **Using `jxl_simd` framework**: Clean, safe, portable SIMD
 3. **Following existing patterns**: gaborish.rs was good template
 4. **Focus on render stages**: That's where pixels are processed
+5. **Profile-guided optimization**: Coefficient order cache (Round 20) and palette SIMD (Round 21) both targeted real bottlenecks
+6. **AVX2 gather instructions**: Perfect for random access patterns like palette lookups
 
 ### What Didn't Work / Lessons Learned
 1. **Speculative optimization**: Round 17 changes showed +0.02x (noise)
@@ -149,21 +159,23 @@ Benchmark variance is ~±0.02x. Small changes might just be jitter.
 
 ## Next Steps to Reach 1.0x
 
+### URGENT (Must Fix Before Proceeding!)
+1. **Investigate grayscale_5 regression**: 1.01x → 1.62x
+   - Compare Round 20 vs Round 21 builds
+   - Profile grayscale_5 specifically
+   - Check if palette changes affected non-palette paths
+   - Consider code layout effects
+
 ### Immediate (High Priority)
-1. **Profile grayscale_jpeg**: Find actual hot path
-   - Use `perf record` + flamegraph
-   - Identify top functions by CPU time
-   - Stop guessing, start measuring
+2. **Profile noise_5 (NEW #1 at 2.12x)**
+   - ANS entropy decoding bottleneck
+   - Already has SIMD but may need more optimization
+   - Use perf + flamegraph to identify hot spots
 
-2. **Optimize palette transforms**: If profiling shows they're hot
-   - SIMD-vectorize the inner loop
-   - Batch palette lookups
-   - Could give 10-20% on modular images
-
-3. **Check memory patterns**: Profile memory access
-   - Cache miss rates
-   - Allocation patterns
-   - Memory bandwidth usage
+3. **Profile grayscale_jpeg tests (1.82x-1.92x)**
+   - Find actual hot path with flamegraph
+   - Identify if JPEG recompression is the issue
+   - Compare with pure grayscale path
 
 ### Medium Priority
 4. **Optimize remaining tf.rs functions**: HLG, linear_to_pq
@@ -178,21 +190,32 @@ Benchmark variance is ~±0.02x. Small changes might just be jitter.
 ## Commitment
 
 We've made excellent progress:
-- **From 1.76x to 1.34x** = 24% of gap closed
-- **Need 1.34x to 1.00x** = 25% more to go
-- **Key milestone**: grayscale_5 at 1.01x (essentially at parity!)
+- **From 1.76x to 1.35x** = 24% of gap closed
+- **Need 1.35x to 1.00x** = 26% more to go
+- **Key win**: cafe 2.22x → 1.65x (25% improvement!)
+- **Key concern**: grayscale_5 regressed from 1.01x to 1.62x (LOST PARITY!)
 
-The next 25% will be harder than the first 24%. We need:
-- **Data-driven optimization** (profiling, not guessing) ✅ Proven with coeff_order!
-- **Focus on actual bottlenecks** (not speculative changes) ✅ ANS prefetch taught us this
+The next 26% will be harder than the first 24%. We need:
+- **Data-driven optimization** (profiling, not guessing) ✅ Proven with coeff_order and palette!
+- **Focus on actual bottlenecks** (not speculative changes) ✅ cafe optimization success!
 - **Systematic approach** (measure, optimize, verify) ✅ Working!
+- **Investigate regressions immediately** ⚠️ grayscale_5 must be fixed!
 
 **The goal is clear: 1.0x or better. We won't stop until we get there!**
 
-We're now at **1.34x average** with one test (grayscale_5) essentially at parity.
-The path to 1.0x is clear: profile, optimize, repeat! 🎯
+We're now at **1.35x average** with cafe optimized from #1 → #5.
+**Critical next step**: Fix grayscale_5 regression before proceeding! 🎯
 
 ## Files Modified
+
+### Round 21 Changes (MIXED - cafe SUCCESS, grayscale_5 REGRESSION!)
+- `jxl/src/frame/modular/transforms/palette.rs` - AVX2 gather for palette lookups
+  - Added `do_palette_simple_avx2()` - Processes 8 pixels with gather instruction
+  - Added `do_palette_simple_scalar()` - Fallback for non-AVX2
+  - Modified `do_palette_step_general()` - Runtime dispatch with feature detection
+  - SIMD bounds checking: Fast path for valid indices, scalar for edge cases
+  - Result: cafe 2.22x → **1.65x** (25% faster!), BUT grayscale_5 1.01x → 1.62x (regression!)
+  - Overall: 1.34x → **1.35x** (slight regression)
 
 ### Round 20 Changes (SUCCESS!)
 - `jxl/src/frame/coeff_order.rs` - Added OnceLock cache for natural_coeff_order()
@@ -223,8 +246,9 @@ The path to 1.0x is clear: profile, optimize, repeat! 🎯
 - 9 render stage files with comprehensive SIMD
 - Noise, YCbCr, chroma_upsample, upsample, convert, blending, etc.
 
-Total lines added across all rounds: ~2500+
-Total performance improvement: **1.76x → 1.34x** (24% of gap closed!)
+Total lines added across all rounds: ~2700+
+Total performance improvement: **1.76x → 1.35x** (24% of gap closed!)
+**Note**: Round 21 cafe improvement (25%!) offset by grayscale_5 regression
 
 ## Current Branch Status
 - Branch: `perf/noise-simd-optimization`
