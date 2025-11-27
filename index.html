@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>jxl-rs Performance Report - Round 20: Coefficient Cache Optimization</title>
+    <title>jxl-rs Performance Report - Round 21: Palette Transform SIMD</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -166,38 +166,39 @@
 </head>
 <body>
     <div class="container">
-        <h1>🚀 jxl-rs Performance Report - Round 20</h1>
+        <h1>🚀 jxl-rs Performance Report - Round 21</h1>
 
         <div class="achievement-banner">
-            <h2>🎯 MAJOR MILESTONE!</h2>
-            <div class="subtitle">Average Performance: <strong>1.34x</strong> slowdown</div>
+            <h2>🎨 PALETTE TRANSFORM SIMD!</h2>
+            <div class="subtitle">Average Performance: <strong>1.35x</strong> slowdown</div>
             <div class="subtitle">Down from 1.76x baseline - <strong>24% of gap closed!</strong></div>
             <div class="subtitle">Mission: <strong>"It's not over till it's at worst 1:1 like C++"</strong></div>
         </div>
 
         <div class="parity-banner">
-            <h3>🏆 FIRST TEST AT PARITY!</h3>
-            <div class="subtitle"><strong>grayscale_5: 1.01x</strong> - Essentially matched C++!</div>
-            <div class="subtitle">Proof that 1.0x is achievable! 🎉</div>
+            <h3>🎉 cafe OPTIMIZATION SUCCESS!</h3>
+            <div class="subtitle"><strong>cafe: 2.22x → 1.65x</strong> - 25% improvement!</div>
+            <div class="subtitle">AVX2 gather instructions for palette lookups 🚀</div>
+            <div class="subtitle" style="margin-top: 10px; font-size: 0.9em;">⚠️ <strong>Regression:</strong> grayscale_5: 1.01x → 1.62x (needs investigation)</div>
         </div>
 
         <div class="stats-grid">
             <div class="stat-card success">
                 <div class="stat-label">Average Slowdown</div>
-                <div class="stat-value">1.34x</div>
+                <div class="stat-value">1.35x</div>
                 <div class="stat-detail">From 1.76x baseline | 24% of gap closed</div>
             </div>
 
             <div class="stat-card success">
                 <div class="stat-label">Best Case</div>
                 <div class="stat-value">1.01x</div>
-                <div class="stat-detail">grayscale_5 - AT PARITY! 🔥</div>
+                <div class="stat-detail">bench_oriented_brg tests - Near parity!</div>
             </div>
 
             <div class="stat-card warning">
                 <div class="stat-label">Worst Case</div>
-                <div class="stat-value">2.22x</div>
-                <div class="stat-detail">cafe (large RGB image)</div>
+                <div class="stat-value">2.12x</div>
+                <div class="stat-detail">noise_5 - ANS entropy decoding</div>
             </div>
 
             <div class="stat-card">
