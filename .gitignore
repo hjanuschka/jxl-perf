@@ -11,3 +11,5 @@ benchmark_run.log
 # Added by cargo
 
 /target
+*.data
+*.old

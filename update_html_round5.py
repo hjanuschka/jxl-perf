@@ -1,4 +1,7 @@
-<!DOCTYPE html>
+#!/usr/bin/env python3
+"""Update index.html with Round 5 results"""
+
+html_content = '''<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -280,3 +283,9 @@
     </div>
 </body>
 </html>
+'''
+
+with open('index.html', 'w') as f:
+    f.write(html_content)
+
+print("HTML updated with Round 5 final results!")
