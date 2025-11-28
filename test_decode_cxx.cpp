@@ -10,9 +10,12 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include <cstring>
+#include <sys/stat.h>
 
 #include "jxl/decode.h"
 #include "jxl/decode_cxx.h"
+#include <png.h>
 
 int main(int argc, char* argv[]) {
   if (argc != 2) {
@@ -131,6 +134,77 @@ int main(int argc, char* argv[]) {
          std::chrono::duration<double, std::milli>(total_time).count());
   printf("Throughput:  %8.2f MP/s\n",
          (width * height) / std::chrono::duration<double>(decode_time).count() / 1e6);
+
+  // Save PNG for visual verification (AFTER timing!)
+  const char* save_png_env = std::getenv("SAVE_PNG");
+  if (save_png_env && std::strcmp(save_png_env, "1") == 0) {
+    // Extract testname from filename
+    std::string filename_str(filename);
+    size_t last_slash = filename_str.find_last_of("/\\");
+    std::string basename = (last_slash == std::string::npos)
+                            ? filename_str
+                            : filename_str.substr(last_slash + 1);
+
+    size_t last_dot = basename.find_last_of('.');
+    std::string testname = (last_dot == std::string::npos)
+                            ? basename
+                            : basename.substr(0, last_dot);
+
+    // Create output directory
+    mkdir("./out", 0755);
+
+    std::string png_path = "./out/" + testname + ".cxx.png";
+
+    // Save PNG
+    FILE* fp = fopen(png_path.c_str(), "wb");
+    if (!fp) {
+      std::cerr << "Warning: Failed to create PNG file: " << png_path << std::endl;
+    } else {
+      png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+      if (!png) {
+        std::cerr << "Warning: Failed to create PNG write struct" << std::endl;
+        fclose(fp);
+      } else {
+        png_infop info = png_create_info_struct(png);
+        if (!info) {
+          std::cerr << "Warning: Failed to create PNG info struct" << std::endl;
+          png_destroy_write_struct(&png, nullptr);
+          fclose(fp);
+        } else {
+          if (setjmp(png_jmpbuf(png))) {
+            std::cerr << "Warning: Error during PNG creation" << std::endl;
+            png_destroy_write_struct(&png, &info);
+            fclose(fp);
+          } else {
+            png_init_io(png, fp);
+
+            // Set image attributes
+            png_set_IHDR(
+              png,
+              info,
+              width, height,
+              8,
+              (num_channels == 4) ? PNG_COLOR_TYPE_RGBA : PNG_COLOR_TYPE_RGB,
+              PNG_INTERLACE_NONE,
+              PNG_COMPRESSION_TYPE_DEFAULT,
+              PNG_FILTER_TYPE_DEFAULT
+            );
+            png_write_info(png, info);
+
+            // Write image data row by row
+            for (size_t y = 0; y < height; y++) {
+              png_write_row(png, buffer.data() + y * width * num_channels);
+            }
+
+            png_write_end(png, nullptr);
+            png_destroy_write_struct(&png, &info);
+            fclose(fp);
+            std::cout << "Saved PNG: " << png_path << std::endl;
+          }
+        }
+      }
+    }
+  }
 
   return 0;
 }

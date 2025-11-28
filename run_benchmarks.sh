@@ -78,7 +78,7 @@ for file in $TEST_FILES; do
     rust_failed=0
     for ((i=1; i<=WARMUP_RUNS+BENCHMARK_RUNS; i++)); do
         set +e
-        output=$($RUST_BINARY "$file" 2>&1)
+        output=$(RAYON_NUM_THREADS=8 $RUST_BINARY "$file" 2>&1)
         exit_code=$?
         set -e
 

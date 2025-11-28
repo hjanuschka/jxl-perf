@@ -1,0 +1,133 @@
+=== Running Benchmark Suite ===
+Testbed directory: /tmp/jxl-perf
+
+Found 39 test files
+Warmup runs: 3
+Benchmark runs: 10
+Output: benchmark_results.csv
+
+Both Rust and C++ benchmarks will be run
+
+[1/39] Testing: alpha_nonpremultiplied
+  Rust:  done
+  C++:   done
+[2/39] Testing: alpha_premultiplied
+  Rust:  done
+  C++:   done
+[3/39] Testing: alpha_triangles
+  Rust:  done
+  C++:   done
+[4/39] Testing: animation_icos4d_5
+  Rust:  done
+  C++:   done
+[5/39] Testing: animation_icos4d
+  Rust:  done
+  C++:   done
+[6/39] Testing: animation_newtons_cradle
+  Rust:  done
+  C++:   done
+[7/39] Testing: animation_spline_5
+  Rust:  done
+  C++:   done
+[8/39] Testing: animation_spline
+  Rust:  done
+  C++:   done
+[9/39] Testing: bench_oriented_brg_5
+  Rust:  done
+  C++:   done
+[10/39] Testing: bench_oriented_brg
+  Rust:  done
+  C++:   done
+[11/39] Testing: bicycles
+  Rust:  done
+  C++:   done
+[12/39] Testing: bike_5
+  Rust:  done
+  C++:   done
+[13/39] Testing: bike
+  Rust:  done
+  C++:   done
+[14/39] Testing: blendmodes_5
+  Rust:  done
+  C++:   done
+[15/39] Testing: blendmodes
+  Rust:  done
+  C++:   done
+[16/39] Testing: cafe_5
+  Rust:  done
+  C++:   done
+[17/39] Testing: cafe
+  Rust:  done
+  C++:   done
+[18/39] Testing: cmyk_layers
+  Rust:  done
+  C++:   done
+[19/39] Testing: delta_palette
+  Rust:  done
+  C++:   done
+[20/39] Testing: grayscale_5
+  Rust:  done
+  C++:   done
+[21/39] Testing: grayscale
+  Rust:  done
+  C++:   done
+[22/39] Testing: grayscale_jpeg_5
+  Rust:  done
+  C++:   done
+[23/39] Testing: grayscale_jpeg
+  Rust:  done
+  C++:   done
+[24/39] Testing: grayscale_public_university
+  Rust:  done
+  C++:   done
+[25/39] Testing: lossless_pfm
+  Rust:  done
+  C++:   done
+[26/39] Testing: lz77_flower
+  Rust:  done
+  C++:   done
+[27/39] Testing: noise_5
+  Rust:  done
+  C++:   done
+[28/39] Testing: noise
+  Rust:  done
+  C++:   done
+[29/39] Testing: opsin_inverse_5
+  Rust:  done
+  C++:   done
+[30/39] Testing: opsin_inverse
+  Rust:  done
+  C++:   done
+[31/39] Testing: patches_5
+  Rust:  done
+  C++:   done
+[32/39] Testing: patches
+  Rust:  done
+  C++:   done
+[33/39] Testing: patches_lossless
+  Rust:  done
+  C++:   done
+[34/39] Testing: progressive_5
+  Rust:  done
+  C++:   done
+[35/39] Testing: progressive
+  Rust:  done
+  C++:   done
+[36/39] Testing: spot
+  Rust:  done
+  C++:   done
+[37/39] Testing: sunset_logo
+  Rust:  done
+  C++:   done
+[38/39] Testing: upsampling_5
+  Rust:  done
+  C++:   done
+[39/39] Testing: upsampling
+  Rust:  done
+  C++:   done
+
+=== Benchmark Complete ===
+Results saved to: benchmark_results.csv
+
+To analyze results:
+  python3 analyze_results.py benchmark_results.csv
